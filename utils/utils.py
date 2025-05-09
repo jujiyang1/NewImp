@@ -95,6 +95,60 @@ def MAE(X: np.ndarray, X_true: np.ndarray, mask: np.ndarray, verbose=0) -> np.nd
         return output
 
 
+def RMSE(X: np.ndarray, X_true: np.ndarray, mask: np.ndarray, verbose=0) -> np.ndarray:
+    """
+    Root Mean Squared Error (RMSE) between imputed variables and ground truth.
+
+    Args:
+        X : Data with imputed variables.
+        X_true : Ground truth.
+        mask : Missing value mask (missing if True)
+
+    Returns:
+        RMSE : np.ndarray
+    """
+    mask_ = mask.astype(bool)
+    if verbose == 0:
+        return np.sqrt(np.mean(np.square(X[mask_] - X_true[mask_])))
+    else:
+        num_miss = mask_.sum(axis=0)
+        output = []
+        for i in range(X.shape[-1]):
+            if num_miss[i] == 0:
+                output += ['0']
+            else:
+                _output = np.sqrt(np.mean(np.square(X[:, i][mask_[:, i]] - X_true[:, i][mask_[:, i]])))
+                output += [str(_output.round(5))]
+
+        return output
 
 
-__all__ = ["MAE"]
+def overall_MAE(X: np.ndarray, X_true: np.ndarray) -> float:
+    """
+    Calculate overall Mean Absolute Error (MAE) between two datasets.
+
+    Args:
+        X : Data with imputed variables.
+        X_true : Ground truth.
+
+    Returns:
+        MAE : float
+    """
+    return np.mean(np.absolute(X - X_true))
+
+
+def overall_RMSE(X: np.ndarray, X_true: np.ndarray) -> float:
+    """
+    Calculate overall Root Mean Squared Error (RMSE) between two datasets.
+
+    Args:
+        X : Data with imputed variables.
+        X_true : Ground truth.
+
+    Returns:
+        RMSE : float
+    """
+    return np.sqrt(np.mean(np.square(X - X_true)))
+
+
+__all__ = ["MAE", "RMSE", "overall_MAE", "overall_RMSE"]

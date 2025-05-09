@@ -163,14 +163,14 @@ class NeuralGradFlowImputer(object):
                 logging.info(f"Batchsize larger that half size = {len(X) // 2}. Setting batchsize to {self.batchsize}.")
 
 
-        mask = torch.isnan(X).double()
+        mask = torch.isnan(X).float()
 
         if self.initializer is not None:
             imps = self.initializer.fit_transform(X)
-            imps = torch.tensor(imps).double().to(self.device)
-            imps = (self.noise * torch.randn(mask.shape, device=self.device).double() + imps)[mask]
+            imps = torch.tensor(imps, dtype=torch.float32).to(self.device)
+            imps = (self.noise * torch.randn(mask.shape, device=self.device, dtype=torch.float32) + imps)[mask]
         else:
-            imps = (self.noise * torch.randn(mask.shape).double() + (1) * nanmean(X, 0))[mask.bool()]
+            imps = (self.noise * torch.randn(mask.shape, dtype=torch.float32) + (1) * nanmean(X, 0))[mask.bool()]
         grad_mask = ~mask.bool()
         X_filled = X.detach().clone()
         X_filled[mask.bool()] = imps

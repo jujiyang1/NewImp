@@ -9,7 +9,7 @@ import os
 import argparse
 
 
-from utils.utils import enable_reproducible_results, simulate_scenarios
+from utils.utils import enable_reproducible_results, simulate_scenarios, overall_MAE, overall_RMSE
 from dataloaders import dataset_loader
 
 
@@ -90,7 +90,22 @@ for scenario in SCENARIO:
 
         enable_reproducible_results(args.seed)
         x, x_miss, mask = imputation_scenarios[scenario][p_miss]
-        _, result_list = model.fit_transform(x_miss.copy().values, verbose=True, report_interval=1, X_true=x.copy().values)
+        x_imputed, result_list = model.fit_transform(x_miss.copy().values, verbose=True, report_interval=1, X_true=x.copy().values)
+
+        # Calculate overall MAE and RMSE (for the entire dataset, not just missing values)
+        overall_mae_value = overall_MAE(x_imputed.detach().cpu().numpy(), x.copy().values)
+        overall_rmse_value = overall_RMSE(x_imputed.detach().cpu().numpy(), x.copy().values)
+
+        print(f"\n===== Overall Metrics for {scenario} with {p_miss*100}% missing data =====")
+        print(f"Overall MAE: {overall_mae_value:.6f}")
+        print(f"Overall RMSE: {overall_rmse_value:.6f}")
+        print("=" * 60)
+
+        # Add overall metrics to the result list
+        for dict_idx in result_list:
+            dict_idx["overall_mae"] = overall_mae_value
+            dict_idx["overall_rmse"] = overall_rmse_value
+
         # print(result_list)
         result_list = [pd.DataFrame(dict_idx, index=[0]) for dict_idx in result_list]
         temp_result_df = pd.concat(result_list, axis=0)
@@ -112,12 +127,20 @@ os.makedirs(args.outpath) if not os.path.exists(args.outpath) else None
 csv_name = (f"model_{args.model}_data_{args.dataset_name}_seed_{args.seed}_"
             f"_ode_step_{args.lr}_bandwidth_{args.bandwidth}_reg_{args.entropy_reg}"
             f"_score_{eval(args.mlp_hidden)[0]}_epoch_{args.score_net_epoch}.csv")
+# Print a summary of the results with both missing-only and overall metrics
+print("\n===== SUMMARY OF RESULTS =====")
+for scenario in SCENARIO:
+    for p_miss in P_MISS:
+        scenario_df = result_df[(result_df["missing"] == scenario) & (result_df["p_miss"] == p_miss) & (result_df["interval"] == int(args.iter_time - 1))]
+        if not scenario_df.empty:
+            print(f"\nScenario: {scenario}, Missing: {p_miss*100}%")
+            print(f"Missing-only MAE: {scenario_df['mae'].values[0]:.6f}")
+            print(f"Overall MAE: {scenario_df['overall_mae'].values[0]:.6f}")
+            print(f"Overall RMSE: {scenario_df['overall_rmse'].values[0]:.6f}")
+            print("-" * 40)
+
+print("\nComplete Results DataFrame:")
 print(result_df)
 result_df.to_csv(os.path.join(args.outpath, csv_name), index=None)
-
-
-
-
-
-
+print(f"\nResults saved to {os.path.join(args.outpath, csv_name)}")
 
