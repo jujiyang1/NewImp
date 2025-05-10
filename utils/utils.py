@@ -3,6 +3,7 @@ import numpy as np
 from sklearn.preprocessing import MinMaxScaler, StandardScaler
 from hyperimpute.plugins.utils.simulate import simulate_nan
 import pandas as pd
+import ot
 
 def enable_reproducible_results(seed: int = 0) -> None:
     random.seed(seed)
@@ -151,4 +152,37 @@ def overall_RMSE(X: np.ndarray, X_true: np.ndarray) -> float:
     return np.sqrt(np.mean(np.square(X - X_true)))
 
 
-__all__ = ["MAE", "RMSE", "overall_MAE", "overall_RMSE"]
+def calculate_wasserstein_distance(X: np.ndarray, X_true: np.ndarray, mask: np.ndarray, max_samples: int = 5000) -> float:
+    """
+    Calculate Wasserstein distance between imputed values and ground truth.
+
+    Args:
+        X : Data with imputed variables.
+        X_true : Ground truth.
+        mask : Missing value mask (missing if True)
+        max_samples : Maximum number of samples to use for calculation (for performance)
+
+    Returns:
+        Wasserstein distance : float
+    """
+    mask_ = mask.astype(bool)
+
+    # If dataset is too large, skip calculation to avoid performance issues
+    if X.shape[0] > max_samples:
+        return 0.0
+
+    # Get indices of rows with missing values
+    M = mask_.sum(1) > 0
+    nimp = M.sum()
+
+    if nimp == 0:
+        return 0.0
+
+    # Calculate squared Euclidean distance matrix
+    dist = ((X[M][:, None] - X_true[M]) ** 2).sum(2) / 2.
+
+    # Calculate Wasserstein distance using POT library
+    return ot.emd2(np.ones(nimp) / nimp, np.ones(nimp) / nimp, dist)
+
+
+__all__ = ["MAE", "RMSE", "overall_MAE", "overall_RMSE", "calculate_wasserstein_distance"]
